@@ -640,6 +640,112 @@ html, body, #root {
   color: #e74c3c;
 }
 
+.table-capacity-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.capacity-range {
+  font-size: 11px;
+  color: #aaa;
+  margin-left: 6px;
+}
+
+.table-empty-count {
+  font-size: 11px;
+  color: #999;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* Right Sidebar (Rules + Activity Log) */
+.right-sidebar {
+  width: 280px;
+  background: #fff;
+  border-left: 1px solid #e8e0d8;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.right-sidebar .rules-panel {
+  width: auto;
+  border-left: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.activity-log {
+  border-top: 1px solid #e8e0d8;
+  padding: 12px 16px;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.activity-log h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.operator-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.operator-row input {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.activity-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.activity-empty {
+  color: #aaa;
+  font-size: 12px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.activity-item {
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.activity-main {
+  color: #333;
+}
+
+.activity-meta {
+  color: #999;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.activity-returned {
+  color: #c0392b;
+}
+
 /* Print View */
 .print-view {
   min-height: 100vh;

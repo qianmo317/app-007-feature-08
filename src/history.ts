@@ -54,6 +54,17 @@ export function createHistoryManager(initial: Plan): HistoryManager {
         p.tables = p.tables.filter((t) => t.id !== command.tableId);
         break;
       }
+      case 'setTableCapacity': {
+        const t = p.tables.find((t) => t.id === command.tableId);
+        if (t) {
+          t.capacity = command.capacity;
+          // 缩小容量时把坐不下的宾客退回未分配池（保留靠前位次的人）
+          if (t.seatOrder.length > command.capacity) {
+            t.seatOrder = t.seatOrder.slice(0, command.capacity);
+          }
+        }
+        break;
+      }
       case 'moveGuest': {
         const { guestId, fromTableId, toTableId, toIndex } = command;
         if (fromTableId) {

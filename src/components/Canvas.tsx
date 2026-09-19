@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Plan, Table, Command } from '../types';
 import { generateId } from '../utils';
+import { CAPACITY_MIN, CAPACITY_MAX_BY_SHAPE } from '../types';
+
+const SHAPE_NAMES: Record<Table['shape'], string> = { round: '圆桌', rect: '长条桌' };
 
 interface Props {
   plan: Plan;
@@ -144,21 +147,19 @@ export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap,
                 )}
               </div>
               {isSelected && (
-                <div className="table-capacity-edit" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="table-capacity-edit"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   人数:
-                  <input
-                    type="number"
-                    value={table.capacity}
-                    min={table.seatOrder.length}
-                    max={20}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || table.capacity;
-                      dispatch({ type: 'updateTable', table: { ...table, capacity: Math.max(table.seatOrder.length, Math.min(20, val)) } });
-                    }}
-                    style={{ width: 40, marginLeft: 4 }}
-                  />
+                  <CapacityEditor table={table} dispatch={dispatch} />
+                  <span className="capacity-range">
+                    {CAPACITY_MIN}–{CAPACITY_MAX_BY_SHAPE[table.shape]}人
+                  </span>
                 </div>
               )}
+              <div className="table-empty-count">余 {Math.max(0, table.capacity - table.seatOrder.length)} 位</div>
               <div className="table-seats">
                 {Array.from({ length: table.capacity }).map((_, i) => {
                   const gid = table.seatOrder[i];
@@ -201,5 +202,51 @@ export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap,
         </div>
       )}
     </div>
+  );
+}
+
+function CapacityEditor({ table, dispatch }: { table: Table; dispatch: (cmd: Command) => void }) {
+  const [value, setValue] = useState(String(table.capacity));
+  const max = CAPACITY_MAX_BY_SHAPE[table.shape];
+
+  // 外部（撤销/重做、其他操作）改变容量时同步输入框
+  useEffect(() => {
+    setValue(String(table.capacity));
+  }, [table.capacity]);
+
+  const commit = () => {
+    const val = parseInt(value, 10);
+    if (Number.isNaN(val)) {
+      setValue(String(table.capacity));
+      return;
+    }
+    if (val < CAPACITY_MIN) {
+      alert(`每桌至少 ${CAPACITY_MIN} 人，不能再少了`);
+      setValue(String(table.capacity));
+      return;
+    }
+    if (val > max) {
+      alert(`${SHAPE_NAMES[table.shape]}最多 ${max} 人，不能超过上限`);
+      setValue(String(table.capacity));
+      return;
+    }
+    if (val !== table.capacity) {
+      dispatch({ type: 'setTableCapacity', tableId: table.id, capacity: val });
+    } else {
+      setValue(String(table.capacity));
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      value={value}
+      min={CAPACITY_MIN}
+      max={max}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      style={{ width: 40, marginLeft: 4 }}
+    />
   );
 }
