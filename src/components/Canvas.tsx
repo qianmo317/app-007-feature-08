@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Plan, Table, Command } from '../types';
+import { MIN_CAPACITY, MAX_CAPACITY } from '../types';
 import { generateId } from '../utils';
 
 interface Props {
@@ -8,9 +9,10 @@ interface Props {
   setDragGuestId: (id: string | null) => void;
   conflictMap: Map<string, string[]>;
   dispatch: (cmd: Command) => void;
+  onResizeTable: (tableId: string, capacity: number) => void;
 }
 
-export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap, dispatch }: Props) {
+export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap, dispatch, onResizeTable }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggingTable, setDraggingTable] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -124,6 +126,7 @@ export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap,
         {plan.tables.map((table) => {
           const isSelected = selectedTableId === table.id;
           const isFull = table.seatOrder.length >= table.capacity;
+          const emptyCount = Math.max(0, table.capacity - table.seatOrder.length);
           return (
             <div
               key={table.id}
@@ -137,27 +140,18 @@ export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap,
                     value={table.label}
                     onChange={(e) => dispatch({ type: 'updateTable', table: { ...table, label: e.target.value } })}
                     onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                     style={{ width: 80, fontSize: 13 }}
                   />
                 ) : (
-                  <>{table.label} ({table.seatOrder.length}/{table.capacity})</>
+                  <>
+                    {table.label} ({table.seatOrder.length}/{table.capacity})
+                    {emptyCount > 0 && <span className="table-empty-badge">空{emptyCount}位</span>}
+                  </>
                 )}
               </div>
               {isSelected && (
-                <div className="table-capacity-edit" onClick={(e) => e.stopPropagation()}>
-                  人数:
-                  <input
-                    type="number"
-                    value={table.capacity}
-                    min={table.seatOrder.length}
-                    max={20}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || table.capacity;
-                      dispatch({ type: 'updateTable', table: { ...table, capacity: Math.max(table.seatOrder.length, Math.min(20, val)) } });
-                    }}
-                    style={{ width: 40, marginLeft: 4 }}
-                  />
-                </div>
+                <CapacityEditor table={table} onCommit={(cap) => onResizeTable(table.id, cap)} />
               )}
               <div className="table-seats">
                 {Array.from({ length: table.capacity }).map((_, i) => {
@@ -179,7 +173,7 @@ export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap,
                           {isConflict && <span className="seat-conflict">!</span>}
                         </>
                       ) : (
-                        <span className="seat-empty">{i + 1}号</span>
+                        <span className="seat-empty">{i + 1}号位</span>
                       )}
                     </div>
                   );
@@ -200,6 +194,78 @@ export default function Canvas({ plan, dragGuestId, setDragGuestId, conflictMap,
           <div onClick={() => { addTable('rect'); setShowTableMenu(null); }}>添加长条桌</div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 桌角人数编辑器：草稿式输入，失焦 / 回车才提交。
+ * 超出该桌型上限时拦住不生效，并说明最多能到多少；
+ * 缩小人数不受已坐人数限制，多出来的人由上层退回未分配池。
+ */
+function CapacityEditor({ table, onCommit }: { table: Table; onCommit: (capacity: number) => void }) {
+  const [draft, setDraft] = useState(String(table.capacity));
+  const [error, setError] = useState<string | null>(null);
+  const max = MAX_CAPACITY[table.shape];
+  const shapeName = table.shape === 'round' ? '圆桌' : '长条桌';
+
+  // 外部变化（撤销/重做等）时同步草稿
+  useEffect(() => {
+    setDraft(String(table.capacity));
+    setError(null);
+  }, [table.capacity]);
+
+  const commit = () => {
+    const val = parseInt(draft, 10);
+    if (isNaN(val)) {
+      setDraft(String(table.capacity));
+      setError(null);
+      return;
+    }
+    if (val < MIN_CAPACITY) {
+      setError(`最少 ${MIN_CAPACITY} 人`);
+      return;
+    }
+    if (val > max) {
+      setError(`${shapeName}最多 ${max} 人`);
+      return;
+    }
+    setError(null);
+    if (val !== table.capacity) onCommit(val);
+  };
+
+  const cancel = () => {
+    setDraft(String(table.capacity));
+    setError(null);
+  };
+
+  return (
+    <div
+      className="table-capacity-edit"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <span>人数:</span>
+      <input
+        type="number"
+        className={error ? 'invalid' : ''}
+        value={draft}
+        min={MIN_CAPACITY}
+        max={max}
+        onChange={(e) => { setDraft(e.target.value); setError(null); }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            commit();
+            (e.target as HTMLInputElement).blur();
+          } else if (e.key === 'Escape') {
+            cancel();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+      />
+      <span className="capacity-range">{MIN_CAPACITY}~{max}</span>
+      {error && <div className="capacity-error">{error}</div>}
     </div>
   );
 }

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPlan, savePlan, setRecentPlanId } from '../db';
 import { createHistoryManager } from '../history';
-import { getConflictMap, getTableStats } from '../utils';
-import type { Plan as PlanType, Command } from '../types';
+import { getConflictMap, getTableStats, generateId, getOperatorName, getAuditLog, appendAuditLog } from '../utils';
+import type { Plan as PlanType, Command, AuditEntry } from '../types';
 import GuestPool from '../components/GuestPool';
 import Canvas from '../components/Canvas';
 import RulesPanel from '../components/RulesPanel';
 import StatsBar from '../components/StatsBar';
+import AuditLogPanel from '../components/AuditLogPanel';
 
 export default function PlanPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,7 +19,12 @@ export default function PlanPage() {
   const [dragGuestId, setDragGuestId] = useState<string | null>(null);
   const historyRef = useRef<ReturnType<typeof createHistoryManager> | null>(null);
   const [conflictMap, setConflictMap] = useState<Map<string, string[]>>(new Map());
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (id) setAuditLog(getAuditLog(id));
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -63,6 +69,27 @@ export default function PlanPage() {
     const p = historyRef.current.redo();
     if (p) setPlan(p);
   }, []);
+
+  // 修改某桌人数：分发命令（多出来的人自动回未分配池），并留一条审计记录
+  const handleResizeTable = useCallback((tableId: string, capacity: number) => {
+    if (!historyRef.current || !id) return;
+    const current = historyRef.current.current();
+    const table = current.tables.find((t) => t.id === tableId);
+    if (!table || table.capacity === capacity) return;
+    const returnedCount = Math.max(0, table.seatOrder.length - capacity);
+    dispatch({ type: 'resizeTable', tableId, capacity });
+    const entry: AuditEntry = {
+      id: generateId(),
+      at: Date.now(),
+      actor: getOperatorName(),
+      tableId,
+      tableLabel: table.label,
+      fromCapacity: table.capacity,
+      toCapacity: capacity,
+      returnedCount,
+    };
+    setAuditLog(appendAuditLog(id, entry));
+  }, [id, dispatch]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -123,11 +150,15 @@ export default function PlanPage() {
           setDragGuestId={setDragGuestId}
           conflictMap={conflictMap}
           dispatch={dispatch}
+          onResizeTable={handleResizeTable}
         />
-        <RulesPanel
-          plan={plan}
-          dispatch={dispatch}
-        />
+        <div className="right-sidebar">
+          <RulesPanel
+            plan={plan}
+            dispatch={dispatch}
+          />
+          <AuditLogPanel entries={auditLog} />
+        </div>
       </div>
     </div>
   );

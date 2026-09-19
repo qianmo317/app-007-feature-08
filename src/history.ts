@@ -36,6 +36,17 @@ export function createHistoryManager(initial: Plan): HistoryManager {
         if (idx >= 0) p.tables[idx] = deepClone(command.table);
         break;
       }
+      case 'resizeTable': {
+        const t = p.tables.find((t) => t.id === command.tableId);
+        if (t) {
+          t.capacity = command.capacity;
+          // 缩小人数时，把坐不下的宾客退回未分配池（移出座位即可，人不丢）
+          if (t.seatOrder.length > command.capacity) {
+            t.seatOrder = t.seatOrder.slice(0, command.capacity);
+          }
+        }
+        break;
+      }
       case 'addGuest':
         p.guests.push(deepClone(command.guest));
         break;

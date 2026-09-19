@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Plan } from './types';
+import type { Plan, AuditEntry } from './types';
 
 export function generateId(): string {
   return uuidv4();
@@ -109,4 +109,43 @@ export function importPlanFromJSON(json: string): Plan | null {
     }
   } catch {}
   return null;
+}
+
+/* ---------- 人数变更审计日志（localStorage，按方案分开存） ---------- */
+
+const AUDIT_KEY_PREFIX = 'auditLog:';
+const OPERATOR_KEY = 'operatorName';
+const AUDIT_LIMIT = 100;
+
+export function getOperatorName(): string {
+  try {
+    return localStorage.getItem(OPERATOR_KEY) || '我';
+  } catch {
+    return '我';
+  }
+}
+
+export function setOperatorName(name: string) {
+  try {
+    localStorage.setItem(OPERATOR_KEY, name);
+  } catch {}
+}
+
+export function getAuditLog(planId: string): AuditEntry[] {
+  try {
+    const raw = localStorage.getItem(AUDIT_KEY_PREFIX + planId);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 追加一条记录（新的在前），返回完整列表 */
+export function appendAuditLog(planId: string, entry: AuditEntry): AuditEntry[] {
+  const list = [entry, ...getAuditLog(planId)].slice(0, AUDIT_LIMIT);
+  try {
+    localStorage.setItem(AUDIT_KEY_PREFIX + planId, JSON.stringify(list));
+  } catch {}
+  return list;
 }
